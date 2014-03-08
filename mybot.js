@@ -30,7 +30,7 @@ function new_game() {
 function make_move() {
    // previousMoves = previousMoves || [];
    board = get_board();
-   currentCoords = [get_my_y(), get_my_x()];
+   currentCoords = [get_my_x(), get_my_y()];
 
    // we found an item! take it!
    if (getTile(board, currentCoords) > 0) {
@@ -52,8 +52,12 @@ function make_move() {
    //Once all tiles have been tagged with a value of 'worthiness,'
    // get bot's adjacent tiles and pick the one with the highest worth
    var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
-   return determineDirection(targetCoords);
 
+   //debug
+   console.log(currentCoords);
+   //end debug
+
+   return determineDirection(targetCoords);
    // return PASS;
 }
 
@@ -162,7 +166,7 @@ function averageValuesFromNeighbors (coords, givenBoard) {
 
    var valSum = 0;
    coordsToConsider.forEach(function(coords) {
-      valSum += givenBoard[rowIdx][colIdx];
+      valSum += getTile(givenBoard, coords);
    });
    
    var average = valSum / coordsToConsider.length;
@@ -170,22 +174,14 @@ function averageValuesFromNeighbors (coords, givenBoard) {
 }
 
 function distanceBetween(origin, dest) {
-   return Math.abs(dest[0] - origin[0]) + Math.abs(dest[1] - origin[1]);
+   //though irrelevant, assume origin and dest coords are [x,y] format
+   return Math.abs(dest[1] - origin[1]) + Math.abs(dest[0] - origin[0]);
 }
 
 function forEachTile(board, callback) {
-   //debug
-   console.log("height is")
-   console.log(HEIGHT)
-   console.log("width is")
-   console.log(WIDTH)
-   console.log("my current position is")
-   console.log("" + get_my_x() + "," + get_opponent_y())
-   //end debug
-
-   for (var row = 0; row < HEIGHT; row++) {
-      for (var col = 0; col < WIDTH;  col++) {
-         callback(board[row][col], [row, col]);
+   for (var x = 0; x < WIDTH; x++) {
+      for (var y = 0; y < HEIGHT;  y++) {
+         callback(board[x][y], [x, y]);
       }
    }
 }
@@ -215,15 +211,16 @@ function fanOutFrom(board, originCoords, callback, alreadyChecked) {
 }
 
 function getAdjacentCoords(originCoords) {
-   var originRow = originCoords[0];
-   var originCol = originCoords[1];
+   //originCoords must be [x,y] format
+   var originX = originCoords[0];
+   var originY = originCoords[1];
    var adjacent = [];
    var moves = [];
    
-   moves.push([originRow - 1, originCol]);
-   moves.push([originRow + 1, originCol]);
-   moves.push([originRow, originCol + 1]);
-   moves.push([originRow, originCol - 1]);
+   moves.push([originX - 1, originY]);
+   moves.push([originX + 1, originY]);
+   moves.push([originX, originY + 1]);
+   moves.push([originX, originY - 1]);
 
    moves.forEach(function(moveCoords) {
       if ( isWithinBoard(moveCoords) ) {
@@ -235,11 +232,12 @@ function getAdjacentCoords(originCoords) {
 }
 
 function isWithinBoard(coords) {
-   var rowIdx = coords[0];
-   var colIdx = coords[1];
+   //coords must be given in [x,y] format
+   var xCoord = coords[0];
+   var yCoord = coords[1];
 
-   if ( (rowIdx >= 0) && (rowIdx < HEIGHT) ) {
-      if ( (colIdx >= 0) && (colIdx < WIDTH) ) {
+   if ( (xCoord >= 0) && (xCoord < WIDTH) ) {
+      if ( (yCoord >= 0) && (yCoord < HEIGHT) ) {
          return true;
       }
    }
@@ -252,10 +250,10 @@ function buildSubstituteBoard(options) {
    var initialValue = options.initialValue || 0;
    var substitute = [];
 
-   for (var row = 0; row < HEIGHT; row++) {
+   for (var x = 0; x < WIDTH; x++) {
       var newRow = [];
 
-      for (var col = 0; col < WIDTH; col++) {
+      for (var y = 0; y < HEIGHT; y++) {
          newRow.push(initialValue);
       }
 
@@ -266,10 +264,12 @@ function buildSubstituteBoard(options) {
 }
 
 function assignTileValue(matrix, coords, value) {
+   // coords must be given in [x,y] format
    matrix[coords[0]][coords[1]] = value;
 }
 
 function getTile(matrix, coords) {
+   // coords must be given in [x,y] format
    return matrix[coords[0]][coords[1]];
 }
 
@@ -286,16 +286,21 @@ function pickMaxCoords(coordsArray) {
 }
 
 function determineDirection(coords) {
-   if (coords[0] < currentCoords[0]) {
-      return "NORTH";
+   //assuming coords are [x,y] format
+   var givenX = coords[0];
+   var givenY = coords[1];
+   var myX = currentCoords[0];
+   var myY = currentCoords[1];
+   if (givenX < myX) {
+      return WEST;
    }
-   else if (coords[0] > currentCoords[0]) {
-      return "SOUTH";
+   else if (givenX > myX) {
+      return EAST;
    }
-   else if (coords[1] < currentCoords[1]) {
-      return "WEST";
+   else if (givenY < myY) {
+      return SOUTH;
    }
-   else if (coords[1] > currentCoords[1]) {
-      return "EAST";
+   else if (givenY > myY) {
+      return NORTH;
    }
 }
