@@ -36,6 +36,8 @@ function make_move() {
        return TAKE;
    }
 
+   maxBoardDimension = Math.max(HEIGHT, WIDTH);
+
    numFruits = get_number_of_item_types();
    fruitCount = countFruits();
 
@@ -82,53 +84,55 @@ function determineFruitScarcity(fruitCountArr) {
 function determineMoveValues(board) {
    reviewedBoard = buildSubstituteBoard();
 
-   //for each tile
-   
    //determine fruit values
-   determineFruitValues();
+   assignFruitValues();
 
    //determine distance values
 
-   //determine relative values
+   //determine relative opponent values
 }
 
-function determineFruitValues(options) {
+function assignFruitValues(options) {
    fruitCoords = [];
-   var fruitValue = options.fruitValue || 20;
-   var fruitMultiplier = options.fruitMultiplier || 3;
+   var fruitValue = options.fruitValue || (maxBoardDimension * 10);
+   var scarcityMultiplier = options.scarcityMultiplier || 1;
 
    forEachTile(board, function(tileValue, coords) {
       if (tileValue > 0) {
-         var rowIdx = coords[0];
-         var colIdx = coords[1];
-         var fruitScarcity = scarcity.indexOf(tileValue);
-         reviewedBoard[rowIdx][colIdx] = fruitValue + (multiplier * (fruitScarcity + 1));
+         var fruitScarcity = scarcity.indexOf(tileValue) + 1;
+         var valueToAssign = fruitValue + (scarcityMultiplier * fruitScarcity);
+
+         assignTileValue(reviewedBoard, coords, valueToAssign);
          fruitCoords.push([rowIdx, colIdx]);
       }
    });
 
 }
 
-function determineDistanceValues(options) {
-   forEachTile(reviewedBoard, function(tileValue, coords) {
-      if (tileValue == undefined) {
-         var rowIdx = coords[0];
-         var colIdx = coords[1];
-         reviewedBoard[rowIdx][colIdx] = 0;
-         // reviewedBoard[row][col] += distanceBetween([row, col], []);
-      }
-   });
+function assignDistFromFruitValues(options) {
+   var reductionAmount = options.reductionAmount || maxBoardDimension;
+   var reductionMultiplier = options.reductionMultiplier || 2;
+   var netReduction = reductionAmount * reductionMultiplier;
 
+   //step refers to a tile some step away from original position
+   fruitCoords.forEach(function(fruitPos) {
+      fanOutFrom(reviewedBoard, fruitPos, function(stepValue, stepCoords) {
+         var distance = distanceBetween(fruitPos, stepCoords);
+         var targetFruitValue = getTile(reviewedBoard, fruitPos);
+         var newValue = stepValue + (targetFruitValue - netReduction);
+         
+         assignTileValue(reviewedBoard, stepCoords, newValue);
+      });
+   });
 }
 
-function averageValuesFromNeighbors(coords, givenBoard) {
+function averageValuesFromNeighbors (coords, givenBoard) {
    //averages neighboring tiles from 'board'. Calculates using current
    // coords if value > 0
-   var rowIdx = coords[0];
-   var colIdx = coords[1];
    var givenBoard = givenBoard || reviewedBoard;
    var coordsToConsider = getAdjacentCoords(coords);
-   var currentVal = givenBoard[rowIdx][colIdx];
+   var currentVal = getTile(givenBoard, coords);
+
    if ( currentVal > 0 ) {
       coordsToConsider.push(coords);
    }
@@ -162,10 +166,7 @@ function fanOutFrom(board, originCoords, callback) {
    if (adjacentMoves.length == 0) return;
 
    adjacentMoves.forEach(function (adjCoords) {
-      var rowIdx = adjCoords[0];
-      var colIdx = adjCoords[1];
-
-      callback(board[rowIdx][colIdx], adjCoords);
+      callback(getTile(board, adjCoords), adjCoords);
       fanOutFrom(board, adjCoords, callback);
    });
 }
@@ -218,4 +219,12 @@ function buildSubstituteBoard(options) {
    }
 
    return substitute;
+}
+
+function assignTileValue(matrix, coords, value) {
+   matrix[coords[0]][coords[1]] = value;
+}
+
+function getTile(matrix, coords) {
+   return matrix[coords[0]][coords[1]];
 }
