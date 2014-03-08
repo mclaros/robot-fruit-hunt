@@ -87,14 +87,14 @@ function determineMoveValues(board) {
    //for each tile
    
    //determine fruit values
-   determineFruitValues(reviewedBoard);
+   determineFruitValues();
 
    //determine distance values
 
    //determine relative values
 }
 
-function determineFruitValues(reviewedBoard, options) {
+function determineFruitValues(options) {
    fruitCoords = [];
    var fruitValue = options.fruitValue || 20;
    var fruitMultiplier = options.fruitMultiplier || 3;
@@ -109,24 +109,18 @@ function determineFruitValues(reviewedBoard, options) {
 
 }
 
-function determineDistanceValues(board) {
+function determineDistanceValues(options) {
    forEachTile(reviewedBoard, function(tileValue, rowIdx, colIdx) {
       if (tileValue == undefined) {
          reviewedBoard[rowIdx][colIdx] = 0;
-
+         // reviewedBoard[row][col] += distanceBetween([row, col], []);
       }
    });
 
-   for (var row = 0; row < HEIGHT; row++) {
-      for (var col = 0; col < WIDTH; col++) {
-         if (reviewedBoard[row][col] === undefined) reviewedBoard[row][col] = 0;
-         reviewedBoard[row][col] += getDistance([row, col], []);
-      }
-   }
 }
 
-function getDistance(origin, destinations) {
-   return (coords2[0] - origin[0]) + (coords2[1] - origin[1]);
+function distanceBetween(origin, dest) {
+   return Math.abs(dest[0] - origin[0]) + Math.abs(dest[1] - origin[1]);
 }
 
 function forEachTile(board, callback) {
@@ -135,4 +129,43 @@ function forEachTile(board, callback) {
          callback(board[row][col], row, col);
       }
    }
+}
+
+function fanOutFrom(board, originCoords, callback) {
+   var rowIdx = originCoords[0];
+   var colIdx = originCoords[1];
+
+}
+
+function getAdjacentCoords(originCoords) {
+   var originRow = originCoords[0];
+   var originCol = originCoords[1];
+   var adjacent = [];
+   var moves = [];
+   
+   moves.push([originRow - 1, originCol]);
+   moves.push([originRow + 1, originCol]);
+   moves.push([originRow, originCol + 1]);
+   moves.push([originRow, originCol - 1]);
+
+   moves.forEach(function(moveCoords) {
+      if ( isWithinBoard(moveCoords) ) {
+         adjacent.push(moveCoords);
+      }
+   });
+
+   return adjacent;
+}
+
+function isWithinBoard(coords) {
+   var rowIdx = coords[0];
+   var colIdx = coords[1];
+
+   if ( (rowIdx >= 0) && (rowIdx < HEIGHT) ) {
+      if ( (colIdx >= 0) && (colIdx < WIDTH) ) {
+         return true;
+      }
+   }
+
+   return false;
 }
