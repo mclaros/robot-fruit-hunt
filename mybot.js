@@ -28,26 +28,26 @@ function new_game() {
 //}
 
 function make_move() {
-   var board = get_board();
+   board = get_board();
 
    // we found an item! take it!
    if (board[get_my_x()][get_my_y()] > 0) {
        return TAKE;
    }
 
-   var numFruits = get_number_of_item_types();
-   var fruitCount = countFruits();
+   numFruits = get_number_of_item_types();
+   fruitCount = countFruits();
 
    //scarcity will determine fruit priority
-   var scarcity = determineFruitScarcity(fruitCount);
+   scarcity = determineFruitScarcity(fruitCount);
 
-   determineMoveValues(board, scarcity);
+   determineMoveValues(board);
 
    //moves = get_valid_moves();
    //moves = 
 
    return PASS;
-};
+}
 
 function countFruits() {
    var fruitCount = [];
@@ -56,7 +56,7 @@ function countFruits() {
       fruitCount.push([type, get_total_item_count(type)]);
    }
    return fruitCount;
-};
+}
 
 function determineFruitScarcity(fruitCountArr) {
    var scarcity = fruitCountArr.slice();
@@ -76,9 +76,9 @@ function determineFruitScarcity(fruitCountArr) {
       scarcity[i] = scarcity[i][0];
    }
    return scarcity;
-};
+}
 
-function determineMoveValues(board, scarcity) {
+function determineMoveValues(board) {
    reviewedBoard = [];
    for (var r = 0; r < HEIGHT; r++) {
       reviewedBoard.push(new Array(WIDTH));
@@ -87,30 +87,36 @@ function determineMoveValues(board, scarcity) {
    //for each tile
    
    //determine fruit values
-   determineFruitValues(board, scarcity);
+   determineFruitValues(reviewedBoard);
 
    //determine distance values
 
    //determine relative values
 }
 
-function determineFruitValues(board, scarcity) {
+function determineFruitValues(reviewedBoard, options) {
    fruitCoords = [];
-   var fruirValue = 20;
-   var multiplier = 3;
+   var fruitValue = options.fruitValue || 20;
+   var fruitMultiplier = options.fruitMultiplier || 3;
 
-   for (var row = 0; row < HEIGHT; row++) {
-      for (var col = 0; col < WIDTH; col++) {
-         var givenValue = board[row][col];
-         if (givenValue > 0) {
-            reviewedBoard[row][col] = 20 + ((scarcity.indexOf(givenValue) + 1) * multiplier);
-            fruitCoords.push([row, col]);
-         }
+   forEachTile(board, function(tileValue, rowIdx, colIdx) {
+      if (tileValue > 0) {
+         var fruitScarcity = scarcity.indexOf(tileValue);
+         reviewedBoard[rowIdx][colIdx] = fruitValue + (multiplier * (fruitScarcity + 1));
+         fruitCoords.push([rowIdx, colIdx]);
       }
-   }
+   });
+
 }
 
 function determineDistanceValues(board) {
+   forEachTile(reviewedBoard, function(tileValue, rowIdx, colIdx) {
+      if (tileValue == undefined) {
+         reviewedBoard[rowIdx][colIdx] = 0;
+
+      }
+   });
+
    for (var row = 0; row < HEIGHT; row++) {
       for (var col = 0; col < WIDTH; col++) {
          if (reviewedBoard[row][col] === undefined) reviewedBoard[row][col] = 0;
@@ -121,4 +127,12 @@ function determineDistanceValues(board) {
 
 function getDistance(origin, destinations) {
    return (coords2[0] - origin[0]) + (coords2[1] - origin[1]);
+}
+
+function forEachTile(board, callback) {
+   for (var row = 0; row < HEIGHT; row++) {
+      for(var col = 0; col < WIDTH;  col++) {
+         callback(board[row][col], row, col);
+      }
+   }
 }

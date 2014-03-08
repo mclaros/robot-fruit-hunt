@@ -1,6 +1,6 @@
 #Fruitbot
 
-My attempt at making a winning bot. May post improved bots here in the future.
+[In Progress] My attempt at making a winning bot. May post improved bots here in the future.
 
 - - -
 
