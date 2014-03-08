@@ -38,7 +38,6 @@ function make_move() {
    }
 
    maxBoardDimension = Math.max(HEIGHT, WIDTH);
-
    numFruits = get_number_of_item_types();
    fruitCount = countFruits();
 
@@ -54,7 +53,10 @@ function make_move() {
    var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
 
    //debug
+   console.log("my coords are");
    console.log(currentCoords);
+   console.log("I should go to");
+   console.log(targetCoords);
    //end debug
 
    return determineDirection(targetCoords);
@@ -130,13 +132,16 @@ function assignDistFromFruitValues(options) {
 
    //step refers to a tile some step away from original position
    fruitCoords.forEach(function(fruitPos) {
+
       fanOutFrom(reviewedBoard, fruitPos, function(stepValue, stepCoords) {
+
          var distance = distanceBetween(fruitPos, stepCoords);
          var targetFruitValue = getTile(reviewedBoard, fruitPos);
          var newValue = stepValue + (targetFruitValue - netReduction);
 
          assignTileValue(reviewedBoard, stepCoords, newValue);
       });
+
    });
 }
 
@@ -200,12 +205,12 @@ function fanOutFrom(board, originCoords, callback, alreadyChecked) {
    adjacentMoves.forEach(function (adjCoords) {
       //Note that in JS, referencing objectLiteral = {} like so: objectLiteral[[a,b]]
       // is equivalent to referencing objectLiteral['a,b']; the array is joined to string
-      if (alreadyChecked[adjCoords] !== "undefined") {
+      if (typeof alreadyChecked[adjCoords] !== "undefined") {
          return true; //skip this iteration
       }
 
       callback(getTile(board, adjCoords), adjCoords);
-      alreadyChecked[coords] = true;
+      alreadyChecked[adjCoords] = true;
       fanOutFrom(board, adjCoords, callback, alreadyChecked);
    });
 }
@@ -246,7 +251,7 @@ function isWithinBoard(coords) {
 }
 
 function buildSubstituteBoard(options) {
-   var options = options || {}
+   var options = options || {};
    var initialValue = options.initialValue || 0;
    var substitute = [];
 
@@ -274,11 +279,21 @@ function getTile(matrix, coords) {
 }
 
 function pickMaxCoords(coordsArray) {
+   //debug
+   console.log("called pickMaxCoords() with coords:");
+   console.log(coordsArray);
+   //end debug
+
    var coordsValues = [];
 
    coordsArray.forEach(function(coords) {
       coordsValues.push(getTile(reviewedBoard, coords));
    });
+
+   //debug
+   console.log("the mapped values are:");
+   console.log(coordsValues);
+   //end debug
 
    var maxValueCoords = Math.max.apply(Math, coordsValues);
    var maxValueIndex = coordsValues.indexOf(maxValueCoords);
@@ -292,15 +307,15 @@ function determineDirection(coords) {
    var myX = currentCoords[0];
    var myY = currentCoords[1];
    if (givenX < myX) {
-      return WEST;
+      return "WEST";
    }
    else if (givenX > myX) {
-      return EAST;
+      return "EAST";
    }
    else if (givenY < myY) {
-      return SOUTH;
+      return "SOUTH";
    }
    else if (givenY > myY) {
-      return NORTH;
+      return "NORTH";
    }
 }
