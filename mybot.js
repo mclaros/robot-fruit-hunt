@@ -53,10 +53,7 @@ function make_move() {
    var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
 
    //debug
-   console.log("my coords are");
-   console.log(currentCoords);
-   console.log("I should go to");
-   console.log(targetCoords);
+   renderReviewedBoard();
    //end debug
 
    return determineDirection(targetCoords);
@@ -109,12 +106,12 @@ function determineFruitScarcity(fruitCountArr) {
 function assignFruitValues(options) {
    fruitCoords = [];
    var options = options || {};
-   var fruitValue = options.fruitValue || (maxBoardDimension * 10);
+   var fruitValue = options.fruitValue || 50 //(maxBoardDimension * 1);
    var scarcityMultiplier = options.scarcityMultiplier || 1;
 
    forEachTile(board, function(tileValue, coords) {
       if (tileValue > 0) {
-         var fruitScarcity = scarcity.indexOf(tileValue) + 1;
+         var fruitScarcity = scarcityOf(tileValue);
          var valueToAssign = fruitValue + (scarcityMultiplier * fruitScarcity);
 
          assignTileValue(reviewedBoard, coords, valueToAssign);
@@ -124,38 +121,59 @@ function assignFruitValues(options) {
 
 }
 
+function scarcityOf(fruitValue) {
+   return scarcity.indexOf(fruitValue) + 1;
+}
+
+// function assignDistFromFruitValues(options) {
+//    var options = options || {};
+//    var reductionAmount = options.reductionAmount || maxBoardDimension;
+//    var reductionMultiplier = options.reductionMultiplier || 0.5;
+//    var netReduction = reductionAmount * reductionMultiplier;
+
+//    //step refers to a tile some step away from original position
+//    fruitCoords.forEach(function(fruitPos) {
+
+//       fanOutFrom(reviewedBoard, fruitPos, function(stepValue, stepCoords) {
+
+//          var distance = distanceBetween(fruitPos, stepCoords);
+//          var targetFruitValue = getTile(reviewedBoard, fruitPos);
+//          var newValue = stepValue + (targetFruitValue - netReduction);
+
+//          assignTileValue(reviewedBoard, stepCoords, newValue);
+//       });
+
+//    });
+// }
+
 function assignDistFromFruitValues(options) {
    var options = options || {};
-   var reductionAmount = options.reductionAmount || maxBoardDimension;
-   var reductionMultiplier = options.reductionMultiplier || 2;
+   var reductionAmount = options.reductionAmount || 10 //maxBoardDimension;
+   var reductionMultiplier = options.reductionMultiplier || 1;
    var netReduction = reductionAmount * reductionMultiplier;
 
-   //step refers to a tile some step away from original position
-   fruitCoords.forEach(function(fruitPos) {
-
-      fanOutFrom(reviewedBoard, fruitPos, function(stepValue, stepCoords) {
-
-         var distance = distanceBetween(fruitPos, stepCoords);
-         var targetFruitValue = getTile(reviewedBoard, fruitPos);
-         var newValue = stepValue + (targetFruitValue - netReduction);
-
-         assignTileValue(reviewedBoard, stepCoords, newValue);
+   forEachTile(reviewedBoard, function(tileValue, tileCoords) {
+      var avgVal = 0;
+      fruitCoords.forEach(function(fruitPos) {
+         avgVal += getTile(reviewedBoard, fruitPos);
+         avgVal -= distanceBetween(tileCoords, fruitPos) * netReduction  * scarcityOf(getTile(board, fruitPos));
       });
-
+      
+      assignTileValue(reviewedBoard, tileCoords, Math.floor(tileValue + avgVal));
    });
 }
 
 function assignDistFromOpponentValues(options) {
-   var options = options || {};
-   var reductionAmount = options.reductionAmount || maxBoardDimension;
-   var reductionMultiplier = options.reductionMultiplier || 2;
-   var netReduction = reductionAmount * reductionMultiplier;
-   var opponentCoords = [get_opponent_x(), get_opponent_y()];
+   // var options = options || {};
+   // var reductionAmount = options.reductionAmount || maxBoardDimension;
+   // var reductionMultiplier = options.reductionMultiplier || 0.2;
+   // var netReduction = reductionAmount * reductionMultiplier;
+   // var opponentCoords = [get_opponent_x(), get_opponent_y()];
 
-   //step refers to a tile some step away from original position, here 'opponentCoords'
-   fanOutFrom(reviewedBoard, opponentCoords, function(stepValue, stepCoords) {
-      var newValue = stepValue - netReduction;
-   });
+   // //step refers to a tile some step away from original position, here 'opponentCoords'
+   // fanOutFrom(reviewedBoard, opponentCoords, function(stepValue, stepCoords) {
+   //    var newValue = stepValue - netReduction;
+   // });
 }
 
 function averageValuesFromNeighbors (coords, givenBoard) {
@@ -279,25 +297,15 @@ function getTile(matrix, coords) {
 }
 
 function pickMaxCoords(coordsArray) {
-   //debug
-   console.log("called pickMaxCoords() with coords:");
-   console.log(coordsArray);
-   //end debug
-
    var coordsValues = [];
 
    coordsArray.forEach(function(coords) {
       coordsValues.push(getTile(reviewedBoard, coords));
    });
 
-   //debug
-   console.log("the mapped values are:");
-   console.log(coordsValues);
-   //end debug
-
    var maxValueCoords = Math.max.apply(Math, coordsValues);
    var maxValueIndex = coordsValues.indexOf(maxValueCoords);
-   return coordsValues[maxValueIndex];
+   return coordsArray[maxValueIndex];
 }
 
 function determineDirection(coords) {
@@ -307,15 +315,50 @@ function determineDirection(coords) {
    var myX = currentCoords[0];
    var myY = currentCoords[1];
    if (givenX < myX) {
-      return "WEST";
+      return WEST;
    }
    else if (givenX > myX) {
-      return "EAST";
+      return EAST;
    }
    else if (givenY < myY) {
-      return "SOUTH";
+      return SOUTH;
    }
    else if (givenY > myY) {
-      return "NORTH";
+      return NORTH;
    }
+}
+
+//// VISUAL DEBUG ABUSING JQUERY!
+function renderReviewedBoard() {
+   $("#reviewedBoard").remove();
+
+   var boardHeight = (HEIGHT * 50) + 10;
+   var boardWidth = (WIDTH * 50) + 10;
+   var $boardDiv = $("<div>");
+   $boardDiv.css({
+      padding: 0,
+      height: boardHeight,
+      width: boardWidth,
+   });
+   $boardDiv.attr({
+      id: "reviewedBoard"
+   });
+   var $tile = $("<div>");
+   $tile.css({
+      border: "1px solid black",
+      margin: 0,
+      float: "left",
+      height: "50px",
+      width: "50px",
+      "font-size": 11
+   });
+
+   forEachTile(reviewedBoard, function(tile, tileCoords) {
+      var $newTile = $tile.clone();
+      $newTile.attr("id", tileCoords.join(","));
+      $newTile.html(tile);
+      $boardDiv.append($newTile);
+   });
+
+   $("body").append($boardDiv);
 }
