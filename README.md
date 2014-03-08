@@ -1,6 +1,7 @@
 #Fruitbot
 
 [In Progress] My attempt at making a winning bot. May post improved bots here in the future.
+Current bot, codenamed "bottalian": [mybot.js](https://github.com/mclaros/robot-fruit-hunt/blob/master/mybot.js)
 
 - - -
 

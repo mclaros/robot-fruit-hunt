@@ -29,6 +29,7 @@ function new_game() {
 
 function make_move() {
    board = get_board();
+   previousMoves = previousMoves || [];
 
    // we found an item! take it!
    if (board[get_my_x()][get_my_y()] > 0) {
@@ -79,10 +80,7 @@ function determineFruitScarcity(fruitCountArr) {
 }
 
 function determineMoveValues(board) {
-   reviewedBoard = [];
-   for (var r = 0; r < HEIGHT; r++) {
-      reviewedBoard.push(new Array(WIDTH));
-   }
+   reviewedBoard = buildSubstituteBoard();
 
    //for each tile
    
@@ -99,8 +97,10 @@ function determineFruitValues(options) {
    var fruitValue = options.fruitValue || 20;
    var fruitMultiplier = options.fruitMultiplier || 3;
 
-   forEachTile(board, function(tileValue, rowIdx, colIdx) {
+   forEachTile(board, function(tileValue, coords) {
       if (tileValue > 0) {
+         var rowIdx = coords[0];
+         var colIdx = coords[1];
          var fruitScarcity = scarcity.indexOf(tileValue);
          reviewedBoard[rowIdx][colIdx] = fruitValue + (multiplier * (fruitScarcity + 1));
          fruitCoords.push([rowIdx, colIdx]);
@@ -110,13 +110,36 @@ function determineFruitValues(options) {
 }
 
 function determineDistanceValues(options) {
-   forEachTile(reviewedBoard, function(tileValue, rowIdx, colIdx) {
+   forEachTile(reviewedBoard, function(tileValue, coords) {
       if (tileValue == undefined) {
+         var rowIdx = coords[0];
+         var colIdx = coords[1];
          reviewedBoard[rowIdx][colIdx] = 0;
          // reviewedBoard[row][col] += distanceBetween([row, col], []);
       }
    });
 
+}
+
+function averageValuesFromNeighbors(coords, givenBoard) {
+   //averages neighboring tiles from 'board'. Calculates using current
+   // coords if value > 0
+   var rowIdx = coords[0];
+   var colIdx = coords[1];
+   var givenBoard = givenBoard || reviewedBoard;
+   var coordsToConsider = getAdjacentCoords(coords);
+   var currentVal = givenBoard[rowIdx][colIdx];
+   if ( currentVal > 0 ) {
+      coordsToConsider.push(coords);
+   }
+
+   var valSum = 0;
+   coordsToConsider.forEach(function(coords) {
+      valSum += givenBoard[rowIdx][colIdx];
+   });
+   
+   var average = valSum / coordsToConsider.length;
+   return average;
 }
 
 function distanceBetween(origin, dest) {
@@ -126,15 +149,25 @@ function distanceBetween(origin, dest) {
 function forEachTile(board, callback) {
    for (var row = 0; row < HEIGHT; row++) {
       for(var col = 0; col < WIDTH;  col++) {
-         callback(board[row][col], row, col);
+         callback(board[row][col], [row, col]);
       }
    }
 }
 
 function fanOutFrom(board, originCoords, callback) {
-   var rowIdx = originCoords[0];
-   var colIdx = originCoords[1];
+   //Start at origin, and perform callback to adjacent tiles,
+   // then recursively do the same to each of their adjacent tiles
 
+   var adjacentMoves = getAdjacentCoords(originCoords);
+   if (adjacentMoves.length == 0) return;
+
+   adjacentMoves.forEach(function (adjCoords) {
+      var rowIdx = adjCoords[0];
+      var colIdx = adjCoords[1];
+
+      callback(board[rowIdx][colIdx], adjCoords);
+      fanOutFrom(board, adjCoords, callback);
+   });
 }
 
 function getAdjacentCoords(originCoords) {
@@ -168,4 +201,21 @@ function isWithinBoard(coords) {
    }
 
    return false;
+}
+
+function buildSubstituteBoard(options) {
+   defaultValue = options.defaultValue || 0;
+   var substitute = [];
+
+   for (var row = 0; row < HEIGHT; row++) {
+      var newRow = [];
+
+      for (var col = 0; col < WIDTH; col++) {
+         newRow.push(defaultValue);
+      }
+
+      substitute.push(newRow);
+   }
+
+   return substitute;
 }
