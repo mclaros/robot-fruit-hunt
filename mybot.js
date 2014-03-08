@@ -30,7 +30,7 @@ function new_game() {
 function make_move() {
    // previousMoves = previousMoves || [];
    board = get_board();
-   currentCoords = [get_my_x(), get_my_y()];
+   currentCoords = [get_my_y(), get_my_x()];
 
    // we found an item! take it!
    if (getTile(board, currentCoords) > 0) {
@@ -53,7 +53,7 @@ function make_move() {
    // get bot's adjacent tiles and pick the one with the highest worth
    var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
    return determineDirection(targetCoords);
-   
+
    // return PASS;
 }
 
@@ -102,6 +102,7 @@ function determineFruitScarcity(fruitCountArr) {
 
 function assignFruitValues(options) {
    fruitCoords = [];
+   var options = options || {};
    var fruitValue = options.fruitValue || (maxBoardDimension * 10);
    var scarcityMultiplier = options.scarcityMultiplier || 1;
 
@@ -111,13 +112,14 @@ function assignFruitValues(options) {
          var valueToAssign = fruitValue + (scarcityMultiplier * fruitScarcity);
 
          assignTileValue(reviewedBoard, coords, valueToAssign);
-         fruitCoords.push([rowIdx, colIdx]);
+         fruitCoords.push(coords);
       }
    });
 
 }
 
 function assignDistFromFruitValues(options) {
+   var options = options || {};
    var reductionAmount = options.reductionAmount || maxBoardDimension;
    var reductionMultiplier = options.reductionMultiplier || 2;
    var netReduction = reductionAmount * reductionMultiplier;
@@ -135,6 +137,7 @@ function assignDistFromFruitValues(options) {
 }
 
 function assignDistFromOpponentValues(options) {
+   var options = options || {};
    var reductionAmount = options.reductionAmount || maxBoardDimension;
    var reductionMultiplier = options.reductionMultiplier || 2;
    var netReduction = reductionAmount * reductionMultiplier;
@@ -149,7 +152,7 @@ function assignDistFromOpponentValues(options) {
 function averageValuesFromNeighbors (coords, givenBoard) {
    //averages neighboring tiles from 'board'. Calculates using current
    // coords if value > 0
-   var givenBoard = givenBoard || reviewedBoard;
+   var givenBoard = (typeof givenBoard === "undefined") ? reviewedBoard : givenBoard;
    var coordsToConsider = getAdjacentCoords(coords);
    var currentVal = getTile(givenBoard, coords);
 
@@ -171,23 +174,43 @@ function distanceBetween(origin, dest) {
 }
 
 function forEachTile(board, callback) {
+   //debug
+   console.log("height is")
+   console.log(HEIGHT)
+   console.log("width is")
+   console.log(WIDTH)
+   console.log("my current position is")
+   console.log("" + get_my_x() + "," + get_opponent_y())
+   //end debug
+
    for (var row = 0; row < HEIGHT; row++) {
-      for(var col = 0; col < WIDTH;  col++) {
+      for (var col = 0; col < WIDTH;  col++) {
          callback(board[row][col], [row, col]);
       }
    }
 }
 
-function fanOutFrom(board, originCoords, callback) {
+function fanOutFrom(board, originCoords, callback, alreadyChecked) {
    //Start at origin, and perform callback to adjacent tiles,
    // then recursively do the same to each of their adjacent tiles
+
+   //To save some checks, keep track of tiles that have been traversed
+   // so as to not double-check every tile.
+   var alreadyChecked = (typeof alreadyChecked === "undefined") ? {} : alreadyChecked;
 
    var adjacentMoves = getAdjacentCoords(originCoords);
    if (adjacentMoves.length == 0) return;
 
    adjacentMoves.forEach(function (adjCoords) {
+      //Note that in JS, referencing objectLiteral = {} like so: objectLiteral[[a,b]]
+      // is equivalent to referencing objectLiteral['a,b']; the array is joined to string
+      if (alreadyChecked[adjCoords] !== "undefined") {
+         return true; //skip this iteration
+      }
+
       callback(getTile(board, adjCoords), adjCoords);
-      fanOutFrom(board, adjCoords, callback);
+      alreadyChecked[coords] = true;
+      fanOutFrom(board, adjCoords, callback, alreadyChecked);
    });
 }
 
@@ -225,14 +248,15 @@ function isWithinBoard(coords) {
 }
 
 function buildSubstituteBoard(options) {
-   defaultValue = options.defaultValue || 0;
+   var options = options || {}
+   var initialValue = options.initialValue || 0;
    var substitute = [];
 
    for (var row = 0; row < HEIGHT; row++) {
       var newRow = [];
 
       for (var col = 0; col < WIDTH; col++) {
-         newRow.push(defaultValue);
+         newRow.push(initialValue);
       }
 
       substitute.push(newRow);
