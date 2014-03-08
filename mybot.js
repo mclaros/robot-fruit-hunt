@@ -28,11 +28,12 @@ function new_game() {
 //}
 
 function make_move() {
+   // previousMoves = previousMoves || [];
    board = get_board();
-   previousMoves = previousMoves || [];
+   currentCoords = [get_my_x(), get_my_y()];
 
    // we found an item! take it!
-   if (board[get_my_x()][get_my_y()] > 0) {
+   if (getTile(board, currentCoords) > 0) {
        return TAKE;
    }
 
@@ -44,12 +45,30 @@ function make_move() {
    //scarcity will determine fruit priority
    scarcity = determineFruitScarcity(fruitCount);
 
+   //assign 'worthiness' to every tile on board based on their distances
+   //  from various targets
    determineMoveValues(board);
 
-   //moves = get_valid_moves();
-   //moves = 
+   //Once all tiles have been tagged with a value of 'worthiness,'
+   // get bot's adjacent tiles and pick the one with the highest worth
+   var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
+   return determineDirection(targetCoords);
+   
+   // return PASS;
+}
 
-   return PASS;
+function determineMoveValues(board) {
+   reviewedBoard = buildSubstituteBoard();
+
+   //game is centered around the fruits; find the fruits, and assign them
+   // some large value based on their scarcity
+   assignFruitValues();
+
+   //for every tile, add to their values according to distance from fruits
+   assignDistFromFruitValues();
+
+   //for every tile, subtract from their values according to distance from opponent
+   assignDistFromOpponentValues();
 }
 
 function countFruits() {
@@ -81,17 +100,6 @@ function determineFruitScarcity(fruitCountArr) {
    return scarcity;
 }
 
-function determineMoveValues(board) {
-   reviewedBoard = buildSubstituteBoard();
-
-   //determine fruit values
-   assignFruitValues();
-
-   //determine distance values
-
-   //determine relative opponent values
-}
-
 function assignFruitValues(options) {
    fruitCoords = [];
    var fruitValue = options.fruitValue || (maxBoardDimension * 10);
@@ -120,9 +128,21 @@ function assignDistFromFruitValues(options) {
          var distance = distanceBetween(fruitPos, stepCoords);
          var targetFruitValue = getTile(reviewedBoard, fruitPos);
          var newValue = stepValue + (targetFruitValue - netReduction);
-         
+
          assignTileValue(reviewedBoard, stepCoords, newValue);
       });
+   });
+}
+
+function assignDistFromOpponentValues(options) {
+   var reductionAmount = options.reductionAmount || maxBoardDimension;
+   var reductionMultiplier = options.reductionMultiplier || 2;
+   var netReduction = reductionAmount * reductionMultiplier;
+   var opponentCoords = [get_opponent_x(), get_opponent_y()];
+
+   //step refers to a tile some step away from original position, here 'opponentCoords'
+   fanOutFrom(reviewedBoard, opponentCoords, function(stepValue, stepCoords) {
+      var newValue = stepValue - netReduction;
    });
 }
 
@@ -227,4 +247,31 @@ function assignTileValue(matrix, coords, value) {
 
 function getTile(matrix, coords) {
    return matrix[coords[0]][coords[1]];
+}
+
+function pickMaxCoords(coordsArray) {
+   var coordsValues = [];
+
+   coordsArray.forEach(function(coords) {
+      coordsValues.push(getTile(reviewedBoard, coords));
+   });
+
+   var maxValueCoords = Math.max.apply(Math, coordsValues);
+   var maxValueIndex = coordsValues.indexOf(maxValueCoords);
+   return coordsValues[maxValueIndex];
+}
+
+function determineDirection(coords) {
+   if (coords[0] < currentCoords[0]) {
+      return "NORTH";
+   }
+   else if (coords[0] > currentCoords[0]) {
+      return "SOUTH";
+   }
+   else if (coords[1] < currentCoords[1]) {
+      return "WEST";
+   }
+   else if (coords[1] > currentCoords[1]) {
+      return "EAST";
+   }
 }
