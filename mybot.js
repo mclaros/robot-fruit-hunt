@@ -1,32 +1,6 @@
 function new_game() {
 }
 
-// function make_move() {
-//    var board = get_board();
-
-//    // we found an item! take it!
-//    if (board[get_my_x()][get_my_y()] > 0) {
-//        return TAKE;
-//    }
-
-//    var rand = Math.random() * 4;
-
-//    if (rand < 1) return NORTH;
-//    if (rand < 2) return SOUTH;
-//    if (rand < 3) return EAST;
-//    if (rand < 4) return WEST;
-
-//    return PASS;
-// }
-
-// Optionally include this function if you'd like to always reset to a 
-// certain board number/layout. This is useful for repeatedly testing your
-// bot(s) against known positions.
-//
-//function default_board_number() {
-//    return 123;
-//}
-
 function make_move() {
    // previousMoves = previousMoves || [];
    board = get_board();
@@ -51,12 +25,15 @@ function make_move() {
    //Once all tiles have been tagged with a value of 'worthiness,'
    // get bot's adjacent tiles and pick the one with the highest worth
    var targetCoords = pickMaxCoords(getAdjacentCoords(currentCoords));
-
+   var direction = determineDirection(targetCoords);
    //debug
    renderReviewedBoard();
+   var directions = {1: 'right', 2: 'up', 3: 'left', 4:'down'};
+
+   console.log(directions[direction]);
    //end debug
 
-   return determineDirection(targetCoords);
+   return direction;
    // return PASS;
 }
 
@@ -71,7 +48,9 @@ function determineMoveValues(board) {
    assignDistFromFruitValues();
 
    //for every tile, subtract from their values according to distance from opponent
-   assignDistFromOpponentValues();
+   // assignDistFromOpponentValues();
+
+   // assignRadialValues();
 }
 
 function countFruits() {
@@ -125,26 +104,18 @@ function scarcityOf(fruitValue) {
    return scarcity.indexOf(fruitValue) + 1;
 }
 
-// function assignDistFromFruitValues(options) {
-//    var options = options || {};
-//    var reductionAmount = options.reductionAmount || maxBoardDimension;
-//    var reductionMultiplier = options.reductionMultiplier || 0.5;
-//    var netReduction = reductionAmount * reductionMultiplier;
+function closestFruitCoords(originCoords) {
+   var closestFruit;
+   var closestDist = 999;
 
-//    //step refers to a tile some step away from original position
-//    fruitCoords.forEach(function(fruitPos) {
-
-//       fanOutFrom(reviewedBoard, fruitPos, function(stepValue, stepCoords) {
-
-//          var distance = distanceBetween(fruitPos, stepCoords);
-//          var targetFruitValue = getTile(reviewedBoard, fruitPos);
-//          var newValue = stepValue + (targetFruitValue - netReduction);
-
-//          assignTileValue(reviewedBoard, stepCoords, newValue);
-//       });
-
-//    });
-// }
+   for (var i = 0; i < fruitCoords.length; i++) {
+      var currDistance = distanceBetween(originCoords, fruitCoords[i]);
+      if ( currDistance < closestDist ) {
+         closestFruit = fruitCoords[i];
+      }
+   }
+   return closestFruit;
+}
 
 function assignDistFromFruitValues(options) {
    var options = options || {};
@@ -153,27 +124,25 @@ function assignDistFromFruitValues(options) {
    var netReduction = reductionAmount * reductionMultiplier;
 
    forEachTile(reviewedBoard, function(tileValue, tileCoords) {
-      var avgVal = 0;
-      fruitCoords.forEach(function(fruitPos) {
-         avgVal += getTile(reviewedBoard, fruitPos);
-         avgVal -= distanceBetween(tileCoords, fruitPos) * netReduction  * scarcityOf(getTile(board, fruitPos));
-      });
-      
-      assignTileValue(reviewedBoard, tileCoords, Math.floor(tileValue + avgVal));
+      if ( fruitCoords.indexOf(tileCoords) == -1 ) {
+         var closestFruit = closestFruitCoords(tileCoords);
+         var distToFruit = distanceBetween(tileCoords, closestFruit);
+         var reducedVal = getTile(reviewedBoard, closestFruit) - (distToFruit * reductionAmount);
+         assignTileValue(reviewedBoard, tileCoords, Math.floor(reducedVal));
+      }
    });
 }
 
-function assignDistFromOpponentValues(options) {
-   // var options = options || {};
-   // var reductionAmount = options.reductionAmount || maxBoardDimension;
-   // var reductionMultiplier = options.reductionMultiplier || 0.2;
-   // var netReduction = reductionAmount * reductionMultiplier;
-   // var opponentCoords = [get_opponent_x(), get_opponent_y()];
-
-   // //step refers to a tile some step away from original position, here 'opponentCoords'
-   // fanOutFrom(reviewedBoard, opponentCoords, function(stepValue, stepCoords) {
-   //    var newValue = stepValue - netReduction;
-   // });
+function assignRadialValues () {
+   fruitCoords.forEach(function (fruitPos) {
+      fanOutFrom(reviewedBoard, fruitPos, function (tileValue, tileCoords) {
+         if ( fruitCoords.indexOf(tileCoords) == -1 ) {
+            var fruitValue = getTile(reviewedBoard, fruitPos);
+            var avgVal = (fruitValue + tileValue) / 2
+            assignTileValue(reviewedBoard, tileCoords, Math.floor(avgVal));
+         }
+      });
+   });
 }
 
 function averageValuesFromNeighbors (coords, givenBoard) {
@@ -223,7 +192,7 @@ function fanOutFrom(board, originCoords, callback, alreadyChecked) {
    adjacentMoves.forEach(function (adjCoords) {
       //Note that in JS, referencing objectLiteral = {} like so: objectLiteral[[a,b]]
       // is equivalent to referencing objectLiteral['a,b']; the array is joined to string
-      if (typeof alreadyChecked[adjCoords] !== "undefined") {
+      if ( alreadyChecked[adjCoords] ) {
          return true; //skip this iteration
       }
 
@@ -320,10 +289,10 @@ function determineDirection(coords) {
    else if (givenX > myX) {
       return EAST;
    }
-   else if (givenY < myY) {
+   else if (givenY > myY) {
       return SOUTH;
    }
-   else if (givenY > myY) {
+   else if (givenY < myY) {
       return NORTH;
    }
 }
@@ -332,8 +301,8 @@ function determineDirection(coords) {
 function renderReviewedBoard() {
    $("#reviewedBoard").remove();
 
-   var boardHeight = (HEIGHT * 50) + 10;
-   var boardWidth = (WIDTH * 50) + 10;
+   var boardHeight = (HEIGHT * 50) + 15;
+   var boardWidth = (WIDTH * 50) + 15;
    var $boardDiv = $("<div>");
    $boardDiv.css({
       padding: 0,
