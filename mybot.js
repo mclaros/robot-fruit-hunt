@@ -13,29 +13,26 @@ function make_move() {
    }
 
    myAdjacentCoords = getAdjacentCoords(currentCoords);
-   maxBoardDimension = Math.max(HEIGHT, WIDTH);
    numFruits = get_number_of_item_types();
    fruitCount = countFruits();
 
    if (turn == 1) {
       //scarcity will determine fruit priority
       scarcity = determineFruitScarcity(fruitCount);
+      maxBoardDimension = Math.max(HEIGHT, WIDTH);
    }
 
-   //assign 'worthiness' to every tile on board based on their distances
-   //  from various targets
-   determineMoveValues(board);
+   reviewedBoard = buildSubstituteBoard();
 
-   //check to see if we are closer to our closest fruit than opponent
-   // to its closest fruit
-   if ( closerThanOpponent() ) {
-      return interceptOpponent();
-   }
+   //Assign each fruit a value
+   assignFruitValues();
 
-   //Once all tiles have been tagged with a value of 'worthiness,'
-   // get bot's adjacent tiles and pick the one with the highest worth
-   var targetCoords = pickMaxCoords(myAdjacentCoords);
-   var direction = determineDirection(targetCoords);
+   //target fruit will be the fruit with the highest value
+   var targetCoords = pickMaxCoords(fruitCoords);
+
+   var nextStep = closestToTarget(myAdjacentCoords, targetCoords);
+   var direction = determineDirection(nextStep);
+
    //debug
    renderReviewedBoard();
    var directions = {1: 'right', 2: 'up', 3: 'left', 4:'down'};
@@ -44,47 +41,30 @@ function make_move() {
    //end debug
 
    return direction;
-   // return PASS;
 }
 
-function closerThanOpponent() {
-   var selfDistToFruit = distanceToClosestFruit(currentCoords);
-   var opponentDistToFruit = distanceToClosestFruit(opponentCoords);
-
-   if (selfDistToFruit <= opponentDistToFruit) {
-      return true;
-   }
-   else {
-      return false;
-   }
-}
-
-function interceptOpponent() {
-   var destination;
-   var minDistance = 999;
-   var targetCoords = closestFruitCoords(currentCoords);
-
-   myAdjacentCoords.forEach(function (coords) {
-      var currDistance = distanceBetween(coords, targetCoords);
-      if (currDistance < minDistance) {
-         destination = coords;
+function determineFruitScarcity(fruitCountArr) {
+   var scarcity = {};
+   var sortedCount = fruitCountArr.slice();
+   sortedCount.sort(function (a, b) {
+      if (a[1] < b[1]) {
+         return -1;
+      }
+      else if (b[1] < a[1]) {
+         return 1;
+      }
+      else {
+         return 0;
       }
    });
-   return determineDirection(destination);
+
+   //consider scarcity to be 1-indexed
+   for (var i = 0; i < sortedCount.length; i++) {
+      scarcity[sortedCount[i][0]] = i + 1;
+   }
+   return scarcity;
 }
 
-function determineMoveValues(board) {
-   reviewedBoard = buildSubstituteBoard();
-
-   //game is centered around the fruits; find the fruits, and assign them
-   // some large value based on their scarcity
-   assignFruitValues();
-
-   //for every tile, add to their values according to distance from fruits
-   assignDistFromFruitValues();
-
-   assignSurroundingAverages();
-}
 
 function countFruits() {
    var fruitCount = [];
@@ -95,114 +75,79 @@ function countFruits() {
    return fruitCount;
 }
 
-function determineFruitScarcity(fruitCountArr) {
-   var scarcity = fruitCountArr.slice();
-
-   scarcity.sort(function (a,b) {
-      if (a[1] < b[1]) {
-         return -1;
-      } else if (b[1] < a[1]) {
-         return 1;
-      } else {
-         return 0;
-      }
-   });
-
-   //dup fruit count, and map over it to show only types (first element)
-   for (var i = 0; i < scarcity.length; i++) {
-      scarcity[i] = scarcity[i][0];
-   }
-   return scarcity;
-}
-
-function assignFruitValues(options) {
+function assignFruitValues() {
    fruitCoords = [];
-   var options = options || {};
-   var fruitValue = options.fruitValue || maxBoardDimension;
-   var scarcityMultiplier = options.scarcityMultiplier || 1;
 
    forEachTile(board, function(tileValue, coords) {
       if (tileValue > 0) {
-         var fruitScarcity = scarcityOf(tileValue);
-         var valueToAssign = fruitValue + (scarcityMultiplier * fruitScarcity);
-
+         var valueToAssign = determineFruitValue(coords);
          assignTileValue(reviewedBoard, coords, valueToAssign);
          fruitCoords.push(coords);
       }
    });
-
 }
 
-function scarcityOf(fruitType) {
-   return scarcity.indexOf(fruitType) + 1;
+function determineFruitValue(fruitCoords, options) {
+   var options = (typeof options === 'undefined') ? {} : options;
+   var scarcityMultiplier = options.scarcityMultiplier || 2;
+   var fruitType = getTile(board, fruitCoords);
+   var fruitScarcity = scarcity[fruitType];
+   var fruitValue = fruitScarcity * scarcityMultiplier;
+
+   fruitValue += averageNearbyScarcity(fruitCoords, 2) * scarcityMultiplier;
+   return fruitValue;
 }
 
-function closestFruitCoords(originCoords) {
-   var closestFruit;
-   var closestDist = 999;
+function averageNearbyScarcity(origin, maxDistance) {
+   var scarcityValueSum = 0;
+   var nearbyFruitCount = 0;
+   var nearbyTiles = nearbyTileCoords(origin, maxDistance);
 
-   for (var i = 0; i < fruitCoords.length; i++) {
-      var currDistance = distanceBetween(originCoords, fruitCoords[i]);
-      if ( currDistance < closestDist ) {
-         closestFruit = fruitCoords[i];
+   nearbyTiles.forEach(function(coords) {
+      var tileValue = getTile(board, coords);
+      if (tileValue > 0) {
+         scarcityValueSum += tileValue;
+         nearbyFruitCount += 1;
+      }
+   });
+   return (scarcityValueSum / nearbyFruitCount) || 0;
+}
+
+function nearbyTileCoords(origin, maxDistance) {
+   var minX = Math.max((origin[0] - maxDistance), 0);
+   var maxX = Math.min((origin[0] + maxDistance), (WIDTH - 1));
+   var minY = Math.max((origin[1] + maxDistance), 0);
+   var maxY = Math.min((origin[1] + maxDistance), (HEIGHT - 1));
+   var nearbyCoords = [];
+
+   for (var x = minX; x <= maxX; x++) {
+      for (var y = minY; y <= maxY; y++) {
+         var currentCoords = [x,y];
+         if (distanceBetween(origin, currentCoords) <= maxDistance) {
+            if (currentCoords != origin) nearbyCoords.push(currentCoords);
+         }
       }
    }
-   return closestFruit;
-}
-
-function distanceToClosestFruit(originCoords) {
-   var closestFruit = closestFruitCoords(originCoords);
-   return distanceBetween(originCoords, closestFruit);
-}
-
-function assignDistFromFruitValues(options) {
-   var options = options || {};
-   var reductionAmount = options.reductionAmount || 10;
-   var reductionMultiplier = options.reductionMultiplier || 1;
-   var netReduction = reductionAmount * reductionMultiplier;
-
-   forEachTile(reviewedBoard, function(tileValue, tileCoords) {
-      if ( getTile(board, tileCoords) == 0 ) {
-         var closestFruit = closestFruitCoords(tileCoords);
-         var fruitType = getTile(board, closestFruit);
-         var fruitValue = getTile(reviewedBoard, closestFruit);
-         var distToFruit = distanceBetween(tileCoords, closestFruit);
-         var reducedVal = fruitValue - (distToFruit * (netReduction / scarcityOf(fruitType)) );
-         assignTileValue(reviewedBoard, tileCoords, Math.floor(reducedVal));
-      }
-   });
-}
-
-function assignSurroundingAverages() {
-   forEachTile(reviewedBoard, function(tileValue, tileCoords) {
-      if (getTile(board, tileCoords) == 0) {
-         var valueToAssign = tileValue + Math.floor( averageValuesFromNeighbors(tileCoords) );
-         assignTileValue( reviewedBoard, tileCoords, valueToAssign );
-      }
-   });
-}
-
-function averageValuesFromNeighbors (coords, givenBoard) {
-   //averages neighboring tiles from 'board'. Calculates using current
-   // coords if value > 0
-   var givenBoard = (typeof givenBoard === "undefined") ? reviewedBoard : givenBoard;
-   var coordsToConsider = getAdjacentCoords(coords);
-   var currentVal = getTile(givenBoard, coords);
-
-   // coordsToConsider.push(coords);
-
-   var valSum = 0;
-   coordsToConsider.forEach(function(coords) {
-      valSum += getTile(givenBoard, coords);
-   });
-   
-   var average = valSum / coordsToConsider.length;
-   return average;
+   return nearbyCoords;
 }
 
 function distanceBetween(origin, dest) {
    //though irrelevant, assume origin and dest coords are [x,y] format
    return Math.abs(dest[1] - origin[1]) + Math.abs(dest[0] - origin[0]);
+}
+
+function closestToTarget(coordChoices, target) {
+   var closestCoords;
+   var minDistance = 999;
+
+   coordChoices.forEach(function(coords) {
+      var currentDistance = distanceBetween(coords, target);
+      if (currentDistance < minDistance) {
+         closestCoords = coords;
+         minDistance = currentDistance;
+      }
+   });
+   return closestCoords;
 }
 
 function forEachTile(board, callback) {
@@ -213,29 +158,6 @@ function forEachTile(board, callback) {
    }
 }
 
-function fanOutFrom(board, originCoords, callback, alreadyChecked) {
-   //Start at origin, and perform callback to adjacent tiles,
-   // then recursively do the same to each of their adjacent tiles
-
-   //To save some checks, keep track of tiles that have been traversed
-   // so as to not double-check every tile.
-   var alreadyChecked = (typeof alreadyChecked === "undefined") ? {} : alreadyChecked;
-
-   var adjacentMoves = getAdjacentCoords(originCoords);
-   if (adjacentMoves.length == 0) return;
-
-   adjacentMoves.forEach(function (adjCoords) {
-      //Note that in JS, referencing objectLiteral = {} like so: objectLiteral[[a,b]]
-      // is equivalent to referencing objectLiteral['a,b']; the array is joined to string
-      if ( alreadyChecked[adjCoords] ) {
-         return true; //skip this iteration
-      }
-
-      callback(getTile(board, adjCoords), adjCoords);
-      alreadyChecked[adjCoords] = true;
-      fanOutFrom(board, adjCoords, callback, alreadyChecked);
-   });
-}
 
 function getAdjacentCoords(originCoords) {
    //originCoords must be [x,y] format
@@ -273,7 +195,7 @@ function isWithinBoard(coords) {
 }
 
 function buildSubstituteBoard(options) {
-   var options = options || {};
+   var options = (typeof options === 'undefined') ? {} : options;
    var initialValue = options.initialValue || 0;
    var substitute = [];
 
@@ -301,15 +223,18 @@ function getTile(matrix, coords) {
 }
 
 function pickMaxCoords(coordsArray) {
-   var coordsValues = [];
+   var maxCoords;
+   var maxValue = 0;
 
-   coordsArray.forEach(function(coords) {
-      coordsValues.push(getTile(reviewedBoard, coords));
+   fruitCoords.forEach(function(coords) {
+      var currentValue = getTile(reviewedBoard, coords);
+      if (currentValue > maxValue) {
+         maxCoords = coords;
+         maxValue = currentValue;
+      }
    });
 
-   var maxValueCoords = Math.max.apply(Math, coordsValues);
-   var maxValueIndex = coordsValues.indexOf(maxValueCoords);
-   return coordsArray[maxValueIndex];
+   return maxCoords;
 }
 
 function determineDirection(coords) {
