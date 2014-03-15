@@ -14,9 +14,9 @@ function make_move() {
 
    myAdjacentCoords = getAdjacentCoords(currentCoords);
    numFruits = get_number_of_item_types();
-   fruitCount = countFruits();
 
    if (turn == 1) {
+      fruitCount = countFruits();
       //scarcity will determine fruit priority
       scarcity = determineFruitScarcity(fruitCount);
       maxBoardDimension = Math.max(HEIGHT, WIDTH);
@@ -27,8 +27,12 @@ function make_move() {
    //Assign each fruit a value
    assignFruitValues();
 
+   //if there are mo fruit near us than near opponent, concentrate those
+   var fruitsToConsider = pruneFruit(fruitCoords);
+
    //target fruit will be the fruit with the highest value
-   var targetCoords = pickMaxCoords(fruitCoords);
+   var targetCoords = acquireTarget(fruitsToConsider);
+   // var targetCoords = acquireTarget(fruitCoords);
 
    var nextStep = closestToTarget(myAdjacentCoords, targetCoords);
    var direction = determineDirection(nextStep);
@@ -41,6 +45,31 @@ function make_move() {
    //end debug
 
    return direction;
+}
+
+function acquireTarget(fruitCoords) {
+   //first, check if we are next to fruit
+   // var surroundingTiles = myAdjacentCoords.concat(getDiagonalCoords(currentCoords));
+   var surroundingTiles = nearbyTileCoords(currentCoords, 2);
+   var bestNearbyFruit = pickMaxCoords(surroundingTiles);
+   if (bestNearbyFruit) {
+      return bestNearbyFruit;
+   }
+
+   //there are no nearby fruit, so go after highest fruit on board
+   return pickMaxCoords(fruitCoords);
+}
+
+function pruneFruit(fruitCoords) {
+   var fruitsToConsider = []
+
+   fruitCoords.forEach(function(coords) {
+      var fruitType = getTile(board, coords);
+      if (get_my_item_count(fruitType) <= Math.floor(fruitCount[fruitType - 1][1])) {
+         fruitsToConsider.push(coords);
+      }
+   });
+   return fruitsToConsider;
 }
 
 function determineFruitScarcity(fruitCountArr) {
@@ -87,14 +116,21 @@ function assignFruitValues() {
    });
 }
 
-function determineFruitValue(fruitCoords, options) {
+function determineFruitValue(coords, options) {
    var options = (typeof options === 'undefined') ? {} : options;
    var scarcityMultiplier = options.scarcityMultiplier || 2;
-   var fruitType = getTile(board, fruitCoords);
+   var fruitType = getTile(board, coords);
    var fruitScarcity = scarcity[fruitType];
    var fruitValue = fruitScarcity * scarcityMultiplier;
 
-   fruitValue += averageNearbyScarcity(fruitCoords, 2) * scarcityMultiplier;
+   //add value to fruit near other fruit
+   fruitValue += averageNearbyScarcity(coords, 3) * scarcityMultiplier;
+
+   //add value to fruit if enemy has more of fruit type than self
+   if (get_opponent_item_count(fruitType) >= get_my_item_count(fruitType)) {
+      fruitValue += scarcityMultiplier;
+   }
+
    return fruitValue;
 }
 
@@ -105,18 +141,16 @@ function averageNearbyScarcity(origin, maxDistance) {
 
    nearbyTiles.forEach(function(coords) {
       var tileValue = getTile(board, coords);
-      if (tileValue > 0) {
-         scarcityValueSum += tileValue;
-         nearbyFruitCount += 1;
-      }
+      scarcityValueSum += tileValue;
+      nearbyFruitCount += 1;
    });
-   return (scarcityValueSum / nearbyFruitCount) || 0;
+   return scarcityValueSum / nearbyFruitCount;
 }
 
 function nearbyTileCoords(origin, maxDistance) {
    var minX = Math.max((origin[0] - maxDistance), 0);
    var maxX = Math.min((origin[0] + maxDistance), (WIDTH - 1));
-   var minY = Math.max((origin[1] + maxDistance), 0);
+   var minY = Math.max((origin[1] - maxDistance), 0);
    var maxY = Math.min((origin[1] + maxDistance), (HEIGHT - 1));
    var nearbyCoords = [];
 
@@ -158,6 +192,26 @@ function forEachTile(board, callback) {
    }
 }
 
+function getDiagonalCoords(originCoords) {
+   //originCoords must be [x,y] format
+   var originX = originCoords[0];
+   var originY = originCoords[1];
+   var diagonal = [];
+   var moves = [];
+   
+   moves.push([originX - 1, originY - 1]);
+   moves.push([originX - 1, originY + 1]);
+   moves.push([originX + 1, originY - 1]);
+   moves.push([originX + 1, originY + 1]);
+
+   moves.forEach(function(moveCoords) {
+      if ( isWithinBoard(moveCoords) ) {
+         diagonal.push(moveCoords);
+      }
+   });
+
+   return diagonal;
+}
 
 function getAdjacentCoords(originCoords) {
    //originCoords must be [x,y] format
@@ -226,7 +280,7 @@ function pickMaxCoords(coordsArray) {
    var maxCoords;
    var maxValue = 0;
 
-   fruitCoords.forEach(function(coords) {
+   coordsArray.forEach(function(coords) {
       var currentValue = getTile(reviewedBoard, coords);
       if (currentValue > maxValue) {
          maxCoords = coords;
